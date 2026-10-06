@@ -331,3 +331,11 @@ svg { display: block; }
   padding: 16px 28px; border-radius: 999px; display: flex; align-items: center; gap: 12px;
 }
 .toast svg { width: 22px; height: 22px; color: #4ade80; }
+
+/* ===== Stage 3 additions: toast animation, error toast, card progress animation ===== */
+.toast { z-index: 50; animation: toast-in 0.2s ease-out; }
+.toast.error svg { color: #f87171; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.progress > div.running { width: 0; animation: fill-bar 1.8s linear forwards; }
+@keyframes fill-bar { to { width: 100%; } }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
