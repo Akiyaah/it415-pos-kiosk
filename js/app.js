@@ -5,44 +5,22 @@
 // The cart, cash entry, payment and receipt use REAL data.
 // Stage 4: strict cash validation (blank, invalid, negative, insufficient) with a red alert box.
 
-/*
- * PENDING OPTIMIZATIONS (not yet merged)
- * Implemented in the optimization branch as app-optimizedv1.js.
- * This file on main does not include them yet.
- *
- * Performance
- * - Replace Array.find in productById() with a Map lookup (PRODUCT_MAP).
- * - Let cartTotal() accept precomputed lines, and build the cart lines once
- *   per render in orderScreen() instead of twice.
- * - Cache generated SVG strings in icon() instead of rebuilding them on
- *   every render.
- *
- * Robustness
- * - Fall back to a generic "box" icon when a product id has no matching
- *   entry in ICONS, instead of rendering "undefined".
- * - Guard removeFromCart() against unknown product ids (currently throws).
- * - HTML-escape product names (esc()) before inserting them into templates.
- * - Store the card-payment timer (cardTimer) and cancel it in
- *   newTransaction().
- * - Add syncSeq() to re-read the saved transaction counter before a number
- *   is issued, so two tabs cannot reuse the same reference.
- *
- * Accessibility
- * - Add role="status" / role="alert" to toasts so screen readers announce
- *   them, and mark decorative icons aria-hidden.
- */
-
 // ---------- State ----------
 const STORAGE_KEY = 'slurpNoodleNextTxn';   // remembers the next transaction number
 const MAX_QTY = 99;                         // largest quantity for one item
-const MAX_PAID_DIGITS = 6;                  // largest cash amount: 999,999
+const MAX_PAID_DIGITS = 6;                  // most digits typed on the keypad
+const MAX_PAID = 999999;                    // largest cash amount in total
 
 const state = {
   screen: 'order',      // order | review | payment | cash | qr | card | success | receipt
   filter: 'All',        // All | Drinks | Food | Snacks
   cart: [],             // [{ id, qty }] - starts empty
   paidText: '',         // digits typed on the cash keypad, e.g. "200"
-  quick: null,          // which quick amount is selected: 'exact' | '200' | '500' | '1000' | null
+  quick: null,          // which quick button looks selected: 'exact' | '200' | '500' | '1000' | null
+  quickSum: 0,          // total of the quick amounts tapped so far (they add up: 200 + 500 = 700)
+  quickCount: 0,        // how many quick amounts were tapped
+  quickKey: null,       // the last quick button tapped
+  typedText: '',        // digits typed on the keypad (typing and quick amounts never mix: the last one used wins)
   cashError: null,      // { title, text } shown in the red alert box when Pay Now is rejected
   processing: false,    // true while the simulated card payment is running
   transaction: null     // the completed transaction (set only after a successful payment)
@@ -195,9 +173,7 @@ function payCard() {
 }
 function newTransaction() {
   state.cart = [];
-  state.paidText = '';
-  state.quick = null;
-  state.cashError = null;
+  resetCash();
   state.processing = false;
   state.transaction = null;
   state.filter = 'All';
@@ -216,26 +192,54 @@ function goTo(screen) {
     return;
   }
   if (screen === 'receipt' && !state.transaction) return;
-  if (screen === 'cash') { state.paidText = ''; state.quick = null; state.cashError = null; }   // fresh cash entry
+  if (screen === 'cash') resetCash();   // fresh cash entry
   state.screen = screen;
   render();
 }
 
 // ---------- Cash keypad ----------
+// The amount paid is EITHER the quick amounts tapped (they add up: ₱200 + ₱500 = ₱700)
+// OR the digits typed on the keypad. Switching from one to the other starts a fresh amount,
+// so tapping ₱200 and then typing 5 gives ₱5, never ₱2,005.
+function resetCash() {
+  state.paidText = ''; state.quickSum = 0; state.quickCount = 0; state.quickKey = null;
+  state.typedText = ''; state.quick = null; state.cashError = null;
+}
+// Rebuilds paidText (the amount shown and validated) from the quick amounts or the typed digits.
+function syncPaid() {
+  const hasAny = state.quickCount > 0 || state.typedText !== '';
+  state.paidText = hasAny ? String(state.quickSum + Number(state.typedText || 0)) : '';
+  // Only highlight a quick button while it is the whole amount (a single tap, nothing typed).
+  state.quick = (state.quickCount === 1 && state.typedText === '') ? state.quickKey : null;
+}
 function pressKey(digit) {
-  if (state.paidText === '' && digit === '0') return;            // no leading zeros
-  if (state.paidText.length >= MAX_PAID_DIGITS) { showToast('Amount is too large', 'error'); return; }
-  state.paidText += digit;
-  state.quick = null;
+  if (state.quickCount > 0) { state.quickSum = 0; state.quickCount = 0; state.quickKey = null; state.typedText = ''; }   // typing starts fresh
+  if (state.typedText === '' && digit === '0') { syncPaid(); render(); return; }   // no leading zeros
+  if (state.typedText.length >= MAX_PAID_DIGITS) {
+    showToast('Amount is too large', 'error'); return;
+  }
+  state.typedText += digit;
   state.cashError = null;
+  syncPaid();
   render();
 }
 function pickQuick(key) {
-  const total = cartTotal();
-  const amounts = { exact: total, '200': 200, '500': 500, '1000': 1000 };
-  state.paidText = String(amounts[key]);
-  state.quick = key;
+  // Exact replaces the amount; typed digits are replaced too. Other quick amounts add up.
+  if (key === 'exact' || state.quickKey === 'exact' || state.typedText !== '') { state.quickSum = 0; state.quickCount = 0; state.typedText = ''; }
+  const amount = key === 'exact' ? cartTotal() : Number(key);
+  if (state.quickSum + amount > MAX_PAID) { showToast('Amount is too large', 'error'); return; }
+  state.quickSum += amount;
+  state.quickCount += 1;
+  state.quickKey = key;
   state.cashError = null;
+  syncPaid();
+  render();
+}
+function backspace() {
+  if (state.typedText !== '') state.typedText = state.typedText.slice(0, -1);
+  else { state.quickSum = 0; state.quickCount = 0; state.quickKey = null; }   // nothing typed: undo the quick amounts
+  state.cashError = null;
+  syncPaid();
   render();
 }
 
@@ -606,8 +610,8 @@ document.getElementById('app').addEventListener('click', function (e) {
   else if (action === 'remove') removeFromCart(id);
   else if (action === 'key') pressKey(btn.dataset.value);
   else if (action === 'quick') pickQuick(btn.dataset.value);
-  else if (action === 'clear') { state.paidText = ''; state.quick = null; state.cashError = null; render(); }
-  else if (action === 'backspace') { state.paidText = state.paidText.slice(0, -1); state.quick = null; state.cashError = null; render(); }
+  else if (action === 'clear') { resetCash(); render(); }
+  else if (action === 'backspace') backspace();
   else if (action === 'paycash') payCash();
   else if (action === 'payqr') payQR();
   else if (action === 'paycard') payCard();
