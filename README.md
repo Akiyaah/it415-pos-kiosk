@@ -114,6 +114,66 @@ The application uses simulated QR and card payments only; no real payment gatewa
 | **Deniele Therese Lodovice** | `deniele1103`           | `Re-designed-UI`             | Visual redesign of the Slurp Noodle House kiosk interface                          | [PR #3 – Re designed UI](https://github.com/Akiyaah/it415-pos-kiosk/pull/3)                      | No review recorded | Merged       |
 | **Jamalee Qym Talento** | `talentojamaleeqym-eng` | `optimization` | Optimization work on the project | No PR recorded | N/A | Active branch / Not merged |
 
+## Acceptance Checklist Verification
+
+The following table maps the IT415 Practical Examination Acceptance Checklist to the implemented features of the Slurp Noodle House Kiosk.
+
+| Requirement | Implementation / Evidence |
+|---|---|
+| Application successfully runs | The kiosk runs as a browser-based HTML, CSS, and JavaScript application and is deployed on Vercel. |
+| Touchscreen-oriented UI is used | The interface uses large touch-friendly controls, product cards, payment options, and navigation buttons. |
+| Large item buttons/cards are provided | Products are displayed as large clickable food cards with Add buttons. |
+| At least six products are available | The kiosk provides 9 food and drink products. |
+| Product prices are displayed | Each product card displays its price in Philippine pesos. |
+| Products can be selected by clicking/tapping | Tapping a product card adds the selected product to the order. |
+| Quantity can be increased | The plus control increases the quantity of an item in the cart. |
+| Quantity can be decreased | The minus control decreases the quantity while preventing invalid quantities below 1. |
+| An item can be removed | The remove/trash control removes an item from the order. |
+| Item subtotal is correct | Each item subtotal is calculated using its quantity and unit price. |
+| Total is calculated correctly | The order total automatically updates when products or quantities change. |
+| Order Summary is provided | The Review Order screen displays the selected products, quantities, prices, subtotals, and total. |
+| User can go back and modify the order | The user can return to the previous screen without losing the cart and can modify the order. |
+| At least three payment methods are available | Cash, QR Payment, and Card Payment are available. |
+| Cash payment works | Cash payment provides a keypad, quick-amount buttons, exact payment, and change calculation. |
+| Insufficient Cash payment is rejected | Cash payments below the total are rejected and an error message is displayed. |
+| Change is calculated correctly | Change is calculated from the amount paid minus the order total. |
+| QR payment can be simulated | QR payment uses a simulated confirmation process and does not process a real payment. |
+| Card payment can be simulated | Card payment uses a simulated processing animation and completion flow. |
+| Payment Successful screen is shown | A successful payment displays a Payment Successful screen with transaction information. |
+| A unique transaction reference is provided | Each completed transaction receives a unique transaction reference in the format `TXN-YYYY-#####`. |
+| View Receipt works | The user can open the receipt after a successful payment. |
+| Receipt contains correct transaction details | The receipt contains the transaction reference, date/time, ordered items, quantities, prices, total, payment method, amount paid, and change where applicable. |
+| Receipt displays the correct payment method | The receipt records the payment method used for the completed transaction. |
+| New Transaction resets the application | Starting a new transaction clears the previous cart, payment information, and receipt and returns the kiosk to an empty order. |
+| Meaningful user feedback is provided | The application provides success toasts, error alerts, quantity validation messages, payment processing feedback, and transaction confirmation messages. |
+
+## GitHub Development Evidence
+
+### Shared Repository
+
+- **Repository:** https://github.com/Akiyaah/it415-pos-kiosk
+- **Repository visibility:** Public
+- **Main / integration branch:** `main`
+- **Project deployment:** https://it415-pos-kiosk.vercel.app
+- **Commit history:** 25 commits
+- **Branches:** 8 branches
+- **Contributors:** 3
+
+The repository was used as the shared project repository for development, version control, feature branches, pull requests, and the final integrated application.
+
+### Pull Request Evidence
+
+| PR | Feature / Stage | Branch | Status | Review Evidence |
+|---|---|---|---|---|
+| PR #1 | Stage 2 – Kiosk Interface | `feature/order-screen` | Merged | No review recorded |
+| PR #2 | Stage 3 – Core Functionality | `stage-3-core-functionality` | Merged | No review recorded |
+| PR #3 | Visual Redesign | `Re-designed-UI` | Merged | No review recorded |
+| PR #4 | Stage 4 – Cash Validation | `feature/cash-validation` | Merged | No review recorded |
+| PR #5 | Stage 5 – Cash Quick-Amount Bug Fix | `bugfix/cash-quick-amounts` | Merged | No review recorded |
+| PR #6 | Stage 6 – Refactoring | `refactor/split-app-modules` | Merged | No review recorded |
+
+The project also contains the `optimization` branch associated with Jamalee Qym Talento. No pull request was recorded for this branch, so it is not presented as a merged contribution.
+
 ## Development Stages
 
 The project was developed incrementally through separate stages. Each stage was
