@@ -1,10 +1,12 @@
-// Campus Store Kiosk - Stage 3 (core functionality)
+// Slurp Noodle House Kiosk - redesign stage (noodle-shop theme, tablet layout)
+// Only the VIEW changed in this stage (markup, icons, illustrations). The cart, payment,
+// validation and transaction logic is exactly the same as before.
 // Every screen is drawn by a small function that returns HTML.
 // The cart, cash entry, payment and receipt now use REAL data.
 // Strict payment validation and its error messages are finished in Stage 4.
 
 // ---------- State ----------
-const STORAGE_KEY = 'campusStoreNextTxn';   // remembers the next transaction number
+const STORAGE_KEY = 'slurpNoodleNextTxn';   // remembers the next transaction number
 const MAX_QTY = 99;                         // largest quantity for one item
 const MAX_PAID_DIGITS = 6;                  // largest cash amount: 999,999
 
@@ -185,12 +187,10 @@ function pickQuick(key) {
 // ---------- Icons (simple line icons, 24x24) ----------
 const ICON_ATTR = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"';
 const ICONS = {
-  coffee:    '<path d="M5 9h11v5a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5z"/><path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 3v3M12 3v3"/>',
-  sandwich:  '<path d="M3 18h18L12 6z"/><path d="M6.5 14h11"/>',
-  softdrink: '<path d="M6 9h12l-1.5 11h-9z"/><path d="M12 9V3l3-1"/><path d="M6.7 13.5h10.6"/>',
-  cookies:   '<circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r="1" fill="currentColor"/><circle cx="14.5" cy="9" r="1" fill="currentColor"/><circle cx="14" cy="14.5" r="1" fill="currentColor"/><circle cx="9.5" cy="15" r="1" fill="currentColor"/>',
-  water:     '<path d="M10 2h4v3l2 3v12a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V8l2-3z"/><path d="M8 12h8M8 16h8"/>',
-  chocolate: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M12 4v16M4 12h16"/>',
+  all:       '<rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/>',
+  noodles:   '<path d="M3 11h18a9 9 0 0 1-18 0z"/><path d="M8.5 21h7"/><path d="M13.5 3.5L11 9M17 4.5L14.5 9"/>',
+  sides:     '<path d="M3 17c0-5.5 4-9.5 9-9.5s9 4 9 9.5z"/><path d="M8 11.5l1 5.5M12 9.5v7.5M16 11.5l-1 5.5"/>',
+  drinks:    '<path d="M6 8h12l-1.5 12h-9z"/><path d="M12 8V3l4-1"/><path d="M6.7 13h10.6"/>',
   trash:     '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   cart:      '<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.5 12h11L21 7H6"/>',
   cash:      '<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 10h.01M18 14h.01"/>',
@@ -205,10 +205,98 @@ const ICONS = {
   plus:      '<path d="M12 5v14M5 12h14"/>',
   alert:     '<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5h.01"/>'
 };
+const CATEGORY_ICONS = { All: 'all', Noodles: 'noodles', Sides: 'sides', Drinks: 'drinks' };
 function icon(name, size) {
   const s = size ? ' style="width:' + size + 'px;height:' + size + 'px"' : '';
   return '<svg ' + ICON_ATTR + s + '>' + ICONS[name] + '</svg>';
 }
+
+// ---------- Dish illustrations (inline SVG, so the kiosk needs no image files) ----------
+const STEAM = '<g fill="none" stroke="#b8a291" stroke-width="3" stroke-linecap="round" opacity=".55"><path d="M54 30c-5-5 5-9 0-15"/><path d="M70 28c-5-5 5-9 0-15"/><path d="M86 30c-5-5 5-9 0-15"/></g>';
+const SHADOW = '<ellipse cx="70" cy="101" rx="42" ry="5" fill="rgba(60,30,10,.14)"/>';
+const EGG = '<ellipse cx="90" cy="48" rx="12" ry="8" fill="#fff"/><circle cx="90" cy="48" r="4.5" fill="#f59e0b"/>';
+const SCALLION = '<g fill="#65a30d"><circle cx="68" cy="56" r="2.2"/><circle cx="76" cy="53" r="2.2"/><circle cx="60" cy="54" r="2"/><circle cx="82" cy="57" r="2"/></g>';
+
+// One bowl shape reused by every soup dish. o = colors + toppings for that dish.
+function noodleBowl(o) {
+  return '<svg viewBox="0 0 140 110" aria-hidden="true">' + STEAM + SHADOW +
+    '<path d="M18 54h104c0 30-22 46-52 46S18 84 18 54z" fill="' + o.bowl + '"/>' +
+    '<path d="M24 70c30 10 62 10 92 0" fill="none" stroke="' + o.band + '" stroke-width="4" stroke-linecap="round"/>' +
+    '<ellipse cx="70" cy="54" rx="52" ry="13" fill="' + o.rim + '"/>' +
+    '<ellipse cx="70" cy="54" rx="46" ry="10" fill="' + o.broth + '"/>' +
+    '<g fill="none" stroke="' + o.noodle + '" stroke-width="' + (o.thick || 3.5) + '" stroke-linecap="round">' +
+    '<path d="M36 53q8-7 16 0t16 0t16 0t16 0"/><path d="M42 57q8-6 14 0t14 0t14 0t14 0"/></g>' + o.tops + '</svg>';
+}
+
+const ART = {
+  tonkotsu: function () {
+    return noodleBowl({ bowl: '#fffdf9', band: '#d9480f', rim: '#f1e4d3', broth: '#f4e1c1', noodle: '#f6c453',
+      tops: EGG + '<circle cx="50" cy="47" r="10" fill="#e9a8a0"/><circle cx="50" cy="47" r="6.5" fill="none" stroke="#c97a73" stroke-width="2"/>' +
+            '<rect x="68" y="30" width="13" height="24" rx="1.5" fill="#1f3326" transform="rotate(10 74 42)"/>' + SCALLION });
+  },
+  spicymiso: function () {
+    return noodleBowl({ bowl: '#7f1d1d', band: '#fca5a5', rim: '#5f1414', broth: '#e0662a', noodle: '#f6c453',
+      tops: EGG + '<g fill="#facc15"><circle cx="52" cy="47" r="3"/><circle cx="60" cy="50" r="3"/><circle cx="48" cy="52" r="3"/></g>' +
+            '<g fill="#b91c1c"><circle cx="70" cy="48" r="1.8"/><circle cx="74" cy="52" r="1.8"/><circle cx="66" cy="53" r="1.8"/><circle cx="78" cy="48" r="1.8"/></g>' + SCALLION });
+  },
+  beefmami: function () {
+    return noodleBowl({ bowl: '#fffdf9', band: '#2563eb', rim: '#eadfce', broth: '#e7c58a', noodle: '#f3d27a',
+      tops: '<ellipse cx="52" cy="47" rx="10" ry="5.5" fill="#8b4a2b" transform="rotate(-12 52 47)"/><ellipse cx="68" cy="44" rx="10" ry="5.5" fill="#a15a36" transform="rotate(8 68 44)"/>' +
+            '<path d="M88 52c-6-14 2-20 8-18 6 2 6 12-8 18z" fill="#4d7c0f"/><path d="M92 50c-2-8 0-12 3-13" fill="none" stroke="#a3e635" stroke-width="2"/>' +
+            '<g fill="#c58a2b"><circle cx="76" cy="52" r="1.8"/><circle cx="82" cy="55" r="1.8"/><circle cx="60" cy="55" r="1.8"/></g>' });
+  },
+  udon: function () {
+    return noodleBowl({ bowl: '#2f3e46', band: '#94a3b8', rim: '#1f2a30', broth: '#ead19b', noodle: '#fffaf0', thick: 6,
+      tops: '<circle cx="50" cy="46" r="9" fill="#fff"/><path d="M44 46q3-5 6 0t6 0" fill="none" stroke="#f472b6" stroke-width="2.4" stroke-linecap="round"/>' +
+            '<path d="M82 52c2-10 12-14 20-8-2 8-12 12-20 8z" fill="#e8a33d"/><path d="M86 50l12-6" stroke="#c97a1a" stroke-width="2" stroke-linecap="round"/>' + SCALLION });
+  },
+  pancit: function () {
+    return '<svg viewBox="0 0 140 110" aria-hidden="true">' + STEAM + SHADOW +
+      '<ellipse cx="70" cy="80" rx="58" ry="18" fill="#fff"/><ellipse cx="70" cy="78" rx="48" ry="13" fill="#f3ece4"/>' +
+      '<path d="M30 76c4-30 28-40 40-40s36 10 40 40c-14 10-76 10-80 0z" fill="#d99a45"/>' +
+      '<g fill="none" stroke="#b87424" stroke-width="3" stroke-linecap="round"><path d="M38 70q10-8 20 0t20 0t20 0"/><path d="M42 60q10-8 18 0t18 0t18 0"/><path d="M50 50q8-6 14 0t14 0t10 0"/></g>' +
+      '<g fill="#f97316"><circle cx="56" cy="63" r="3.4"/><circle cx="88" cy="57" r="3.4"/><circle cx="76" cy="70" r="3.4"/></g>' +
+      '<g fill="#65a30d"><circle cx="66" cy="54" r="2.8"/><circle cx="98" cy="66" r="2.8"/><circle cx="48" cy="72" r="2.8"/></g>' +
+      '<path d="M84 44c10-4 16 4 12 12" fill="none" stroke="#fb923c" stroke-width="5" stroke-linecap="round"/>' +
+      '<circle cx="114" cy="86" r="9" fill="#84cc16"/><circle cx="114" cy="86" r="6" fill="#d9f99d"/></svg>';
+  },
+  gyoza: function () {
+    const d = function (x, y) {
+      return '<g transform="translate(' + x + ' ' + y + ')"><path d="M-19 7C-15-10 15-10 19 7z" fill="#f7e2b8"/>' +
+        '<path d="M-18 7H18" stroke="#d99a45" stroke-width="3.4" stroke-linecap="round"/>' +
+        '<path d="M-9-5l2 8M0-7v10M9-5l-2 8" stroke="#e1c48c" stroke-width="2" stroke-linecap="round"/></g>';
+    };
+    return '<svg viewBox="0 0 140 110" aria-hidden="true">' + STEAM + SHADOW +
+      '<ellipse cx="66" cy="76" rx="56" ry="20" fill="#fff"/><ellipse cx="66" cy="74" rx="46" ry="15" fill="#f3ece4"/>' +
+      d(44, 68) + d(88, 68) + d(66, 80) + d(66, 62) +
+      '<ellipse cx="116" cy="88" rx="14" ry="6" fill="#fff"/><ellipse cx="116" cy="87" rx="10" ry="3.6" fill="#4a2a18"/></svg>';
+  },
+  siomai: function () {
+    const s = function (x, y) { return '<circle cx="' + x + '" cy="' + y + '" r="9" fill="#f6cf6a"/><circle cx="' + x + '" cy="' + (y - 1) + '" r="2.8" fill="#f97316"/>'; };
+    return '<svg viewBox="0 0 140 110" aria-hidden="true">' + STEAM + SHADOW +
+      '<path d="M22 62h96v18c0 10-20 18-48 18S22 90 22 80z" fill="#d9a766"/>' +
+      '<g stroke="#b98343" stroke-width="2.5" stroke-linecap="round" fill="none"><path d="M34 70c24 8 48 8 72 0"/><path d="M30 80c26 9 54 9 80 0"/></g>' +
+      '<ellipse cx="70" cy="62" rx="48" ry="12" fill="#e8bf85"/><ellipse cx="70" cy="62" rx="42" ry="9" fill="#c99555"/>' +
+      s(50, 60) + s(70, 56) + s(90, 60) + s(70, 65) + '</svg>';
+  },
+  icedtea: function () {
+    return '<svg viewBox="0 0 140 110" aria-hidden="true">' + SHADOW +
+      '<path d="M80 6L72 52" stroke="#d9480f" stroke-width="4" stroke-linecap="round"/>' +
+      '<path d="M46 22h48l-6 76H52z" fill="rgba(255,255,255,.65)" stroke="#c9b6a3" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<path d="M49 42h42l-4.5 54H53.5z" fill="#d9822b" opacity=".92"/>' +
+      '<g fill="#fff" opacity=".65"><rect x="56" y="48" width="14" height="14" rx="3" transform="rotate(-12 63 55)"/><rect x="72" y="58" width="14" height="14" rx="3" transform="rotate(10 79 65)"/><rect x="58" y="72" width="13" height="13" rx="3" transform="rotate(8 64 78)"/></g>' +
+      '<circle cx="98" cy="30" r="13" fill="#facc15"/><circle cx="98" cy="30" r="9.5" fill="#fde68a"/><path d="M98 21v18M89 30h18M91.5 23.5l13 13M104.5 23.5l-13 13" stroke="#facc15" stroke-width="1.6"/></svg>';
+  },
+  greentea: function () {
+    return '<svg viewBox="0 0 140 110" aria-hidden="true">' + STEAM + SHADOW +
+      '<ellipse cx="70" cy="94" rx="46" ry="8" fill="#f3ece4"/>' +
+      '<path d="M98 52h6a10 10 0 0 1 0 20h-8" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/>' +
+      '<path d="M42 44h56v22c0 18-12 28-28 28S42 84 42 66z" fill="#fff"/>' +
+      '<path d="M46 70c16 8 32 8 48 0" fill="none" stroke="#65a30d" stroke-width="4" stroke-linecap="round"/>' +
+      '<ellipse cx="70" cy="44" rx="28" ry="6.5" fill="#e5e7eb"/><ellipse cx="70" cy="44.5" rx="24" ry="5" fill="#8bb358"/></svg>';
+  }
+};
+function art(id) { return ART[id] ? ART[id]() : ''; }
 
 // ---------- Header with step pills ----------
 // done = how many steps show a check mark, active = which step is white (0 = none)
@@ -233,15 +321,16 @@ function headerHTML() {
     return '<div class="step">' + n + ' ' + name + '</div>';
   }).join('');
   return '<header class="header">' +
-    '<div class="brand"><div class="brand-logo">CS</div>' +
-    '<div><div class="brand-name">Campus Store</div><div class="brand-sub">Self-service kiosk</div></div></div>' +
+    '<div class="brand"><div class="brand-logo">' + icon('noodles') + '</div>' +
+    '<div><div class="brand-name">Slurp Noodle House</div><div class="brand-sub">Self-service kiosk</div></div></div>' +
     '<div class="steps">' + pills + '</div></header>';
 }
 
 // ---------- Screen 1: Order ----------
 function orderScreen() {
-  const chips = ['All', 'Drinks', 'Food', 'Snacks'].map(f =>
-    '<button class="chip' + (state.filter === f ? ' selected' : '') + '" data-action="filter" data-value="' + f + '">' + f + '</button>'
+  const chips = CATEGORIES.map(f =>
+    '<button class="cat-tab' + (state.filter === f ? ' selected' : '') + '" data-action="filter" data-value="' + f + '">' +
+    '<span class="cat-icon">' + icon(CATEGORY_ICONS[f]) + '</span><span>' + f + '</span></button>'
   ).join('');
 
   const cards = PRODUCTS
@@ -250,14 +339,14 @@ function orderScreen() {
       const q = qtyOf(p.id);
       return '<button class="product-card' + (q ? ' in-order' : '') + '" data-action="add" data-id="' + p.id + '">' +
         (q ? '<div class="badge">' + q + '</div>' : '') +
-        '<div class="product-tile" style="background:' + p.tile + ';color:' + p.color + '">' + icon(p.id, 64) + '</div>' +
-        '<div class="product-info"><span class="product-name">' + p.name + '</span><span class="product-price">' + peso(p.price) + '</span></div>' +
-        '</button>';
+        '<div class="product-art" style="background:' + p.tile + '">' + art(p.id) + '</div>' +
+        '<span class="product-name">' + p.name + '</span><span class="product-price">' + peso(p.price) + '</span>' +
+        '<span class="add-pill">+ Add</span></button>';
     }).join('');
 
   const lines = cartLines();
   const rows = lines.length === 0
-    ? '<div class="order-empty">' + icon('cart') + '<strong>Your order is empty</strong><span>Tap a product on the left to add it to your order.</span></div>'
+    ? '<div class="order-empty">' + icon('cart') + '<strong>Your order is empty</strong><span>Tap a dish to add it to your order.</span></div>'
     : '<div class="order-rows">' + lines.map(l =>
         '<div class="order-row">' +
         '<div class="row-name">' + l.name + '</div><div class="row-each">' + peso(l.price) + ' each</div>' +
@@ -270,7 +359,8 @@ function orderScreen() {
       ).join('') + '</div>';
 
   return '<main class="screen order-layout">' +
-    '<section class="products-area"><div class="products-top"><h1>Tap a product to add it</h1><div class="chips">' + chips + '</div></div>' +
+    '<section class="products-area"><div class="cat-row">' + chips + '</div>' +
+    '<div class="section-head"><h1>' + (state.filter === 'All' ? 'All Items' : state.filter) + '</h1><span>Tap a dish to add it</span></div>' +
     '<div class="product-grid">' + cards + '</div></section>' +
     '<aside class="order-panel"><div class="panel-head"><h2>Your Order</h2><span>' + itemsLabel(itemCount()) + '</span></div>' +
     rows +
@@ -354,14 +444,14 @@ function qrScreen() {
 
 // ---------- Screen 8: Card ----------
 function cardReaderSVG() {
-  return '<svg viewBox="0 0 320 380" width="330" height="390">' +
+  return '<svg class="reader-svg" viewBox="0 0 390 380">' +
     '<rect x="40" y="40" width="230" height="340" rx="36" fill="#1e293b"/>' +
     '<rect x="62" y="62" width="186" height="120" rx="14" fill="#0f172a"/>' +
     '<text x="76" y="92" fill="#7dd3fc" font-size="13" font-family="monospace">PROCESSING</text>' +
     '<text x="76" y="128" fill="#fff" font-size="28" font-weight="800" font-family="sans-serif">' + peso(cartTotal()) + '</text>' +
     '<g fill="none" stroke="#7dd3fc" stroke-width="5" stroke-linecap="round"><path d="M148 215q12 20 0 40"/><path d="M162 205q20 30 0 60"/><path d="M176 195q28 40 0 80"/></g>' +
     '<rect x="100" y="345" width="110" height="12" rx="6" fill="#0f172a"/>' +
-    '<g transform="rotate(-12 220 130)"><rect x="140" y="70" width="170" height="110" rx="16" fill="#5b21b6"/>' +
+    '<g transform="translate(50 62) rotate(-12 220 130)"><rect x="140" y="70" width="170" height="110" rx="16" fill="#5b21b6"/>' +
     '<rect x="158" y="92" width="38" height="28" rx="6" fill="#facc15"/>' +
     '<text x="158" y="150" fill="#ddd6fe" font-size="14" font-family="monospace">•••• •••• ••••</text>' +
     '<text x="158" y="170" fill="#ddd6fe" font-size="13" font-family="monospace">4821</text></g></svg>';
@@ -401,7 +491,7 @@ function receiptScreen() {
     '<div class="d">' + l.qty + ' × ' + peso(l.price) + '</div></div>'
   ).join('');
   return '<main class="screen receipt-layout"><div class="receipt-paper">' +
-    '<div class="title">CAMPUS STORE POS</div><div class="sub-title">Self-Service Kiosk · Official Digital Receipt</div><div class="dash"></div>' +
+    '<div class="title">SLURP NOODLE HOUSE</div><div class="sub-title">Self-Service Kiosk · Official Digital Receipt</div><div class="dash"></div>' +
     '<div class="r-line"><span>Transaction No.</span><strong>' + t.txn + '</strong></div>' +
     '<div class="r-line"><span>Date</span><span>' + formatDate(t.date) + '</span></div><div class="dash"></div>' +
     '<div class="r-line r-head"><span>ITEM</span><span>SUBTOTAL</span></div>' + items + '<div class="dash"></div>' +
@@ -424,13 +514,19 @@ const SCREENS = {
   qr: qrScreen, card: cardScreen, success: successScreen, receipt: receiptScreen
 };
 
+let lastScreen = null;
 function render() {
-  // Keep the order list scrolled where it was when the screen is redrawn.
-  const list = document.querySelector('.order-rows');
-  const scroll = list ? list.scrollTop : 0;
+  // The product grid, the order list and (on small tablets) the screen itself can scroll.
+  // Remember where each one was so tapping "+ Add" never throws the customer back to the top.
+  const keep = ['.order-rows', '.product-grid', '.screen'];
+  const saved = keep.map(sel => { const el = document.querySelector(sel); return el ? el.scrollTop : 0; });
   document.getElementById('app').innerHTML = headerHTML() + SCREENS[state.screen]();
-  const newList = document.querySelector('.order-rows');
-  if (newList) newList.scrollTop = scroll;
+  keep.forEach((sel, i) => {
+    if (sel === '.screen' && lastScreen !== state.screen) return;   // new screen starts at the top
+    const el = document.querySelector(sel);
+    if (el) el.scrollTop = saved[i];
+  });
+  lastScreen = state.screen;
 }
 
 // One click listener for the whole app. Each button has a data-action.
@@ -441,7 +537,10 @@ document.getElementById('app').addEventListener('click', function (e) {
   const id = btn.dataset.id;
 
   if (action === 'go') goTo(btn.dataset.screen);
-  else if (action === 'filter') { state.filter = btn.dataset.value; render(); }
+  else if (action === 'filter') {
+    state.filter = btn.dataset.value; render();
+    const grid = document.querySelector('.product-grid'); if (grid) grid.scrollTop = 0;
+  }
   else if (action === 'add') addToCart(id);
   else if (action === 'plus') changeQty(id, 1);
   else if (action === 'minus') changeQty(id, -1);
