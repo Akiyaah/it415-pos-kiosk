@@ -1,17 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<!--
-  PENDING OPTIMIZATIONS (not yet merged)
-  Implemented in the optimization branch as index-optimizedv1.html.
-  This file on main does not include them yet.
-
-  - Load scripts with defer (execution order unchanged: products.js, then app).
-  - Point asset references to the optimized files:
-    css/styles-optimizedv1.css and js/app-optimizedv1.js.
-  - Not included in this round: self-hosting the Google Fonts files to remove
-    the external, render-blocking request (follow-up).
--->
-  <head>
+<head>
   <meta charset="UTF-8">
   <!-- Tablet kiosk: fit the screen width, and stop pinch-zoom so a stray touch never zooms the kiosk. -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -31,7 +20,16 @@
   <!-- The whole kiosk is rendered into this container by js/app.js -->
   <div id="app"></div>
 
-  <script src="js/products.js"></script>
-  <script src="js/app.js"></script>
+  <!-- Plain scripts, no build step. ORDER MATTERS: each file may use the ones above it. -->
+  <script src="js/products.js"></script>  <!-- menu data -->
+  <script src="js/state.js"></script>     <!-- state, constants, transaction numbers -->
+  <script src="js/helpers.js"></script>   <!-- peso(), cart math, toast -->
+  <script src="js/icons.js"></script>     <!-- line icons -->
+  <script src="js/art.js"></script>       <!-- dish illustrations -->
+  <script src="js/cart.js"></script>      <!-- add / change quantity / remove -->
+  <script src="js/cash.js"></script>      <!-- cash keypad + quick amounts -->
+  <script src="js/payment.js"></script>   <!-- validation, payments, navigation -->
+  <script src="js/views.js"></script>     <!-- one function per screen -->
+  <script src="js/app.js"></script>       <!-- render + click handling (starts the app) -->
 </body>
 </html>
