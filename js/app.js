@@ -1,21 +1,39 @@
-// Campus Store Kiosk - Stage 2 (interface)
+// Campus Store Kiosk - Stage 3 (core functionality)
 // Every screen is drawn by a small function that returns HTML.
-// The cart, payment and receipt below use SAMPLE DATA so the layouts can be
-// compared with the Sample UI. Real behaviour comes in Stages 3 and 4.
+// The cart, cash entry, payment and receipt now use REAL data.
+// Strict payment validation and its error messages are finished in Stage 4.
 
 // ---------- State ----------
+const STORAGE_KEY = 'campusStoreNextTxn';   // remembers the next transaction number
+const MAX_QTY = 99;                         // largest quantity for one item
+const MAX_PAID_DIGITS = 6;                  // largest cash amount: 999,999
+
 const state = {
   screen: 'order',      // order | review | payment | cash | qr | card | success | receipt
   filter: 'All',        // All | Drinks | Food | Snacks
-  cart: [               // SAMPLE order (replaced by real add/remove logic in Stage 3)
-    { id: 'coffee', qty: 2 },
-    { id: 'sandwich', qty: 1 },
-    { id: 'softdrink', qty: 1 }
-  ]
+  cart: [],             // [{ id, qty }] - starts empty
+  paidText: '',         // digits typed on the cash keypad, e.g. "200"
+  quick: null,          // which quick amount is selected: 'exact' | '200' | '500' | '1000' | null
+  processing: false,    // true while the simulated card payment is running
+  transaction: null     // the completed transaction (set only after a successful payment)
 };
 
-// SAMPLE values for the cash, success and receipt screens (real values in Stage 3)
-const SAMPLE = { txn: 'TXN-2026-00125', qrRef: 'QR-TXN-2026-00126', method: 'Cash', paid: 200, date: 'October 6, 2026 · 10:42 AM' };
+// Transaction numbers: TXN-<year>-<5 digit number>. The number goes up by 1 for every
+// COMPLETED transaction, so two transactions never share a reference.
+// It is kept in memory and saved to Local Storage so it survives a page reload.
+let nextSeq = loadSeq();
+function loadSeq() {
+  try {
+    const n = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+    return n > 0 ? n : 1;
+  } catch (e) { return 1; }
+}
+function saveSeq() {
+  try { localStorage.setItem(STORAGE_KEY, String(nextSeq)); } catch (e) { /* storage unavailable: keep counting in memory */ }
+}
+function reference(prefix) {
+  return prefix + '-' + new Date().getFullYear() + '-' + String(nextSeq).padStart(5, '0');
+}
 
 // ---------- Helpers ----------
 function peso(amount) {
@@ -32,6 +50,137 @@ function cartTotal() { return cartLines().reduce((sum, l) => sum + l.subtotal, 0
 function itemCount() { return state.cart.reduce((sum, c) => sum + c.qty, 0); }
 function itemsLabel(n) { return n + (n === 1 ? ' item' : ' items'); }
 function qtyOf(id) { const c = state.cart.find(x => x.id === id); return c ? c.qty : 0; }
+function paidAmount() { return Number(state.paidText || 0); }
+function formatDate(d) {
+  const day = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\u202f/g, ' ');
+  return day + ' · ' + time;
+}
+
+// ---------- Toast messages (bottom center) ----------
+let toastTimer = null;
+function showToast(message, type) {
+  const old = document.getElementById('toast');
+  if (old) old.remove();
+  const el = document.createElement('div');
+  el.id = 'toast';
+  el.className = 'toast' + (type === 'error' ? ' error' : '');
+  el.innerHTML = icon(type === 'error' ? 'alert' : 'check') + '<span></span>';
+  el.querySelector('span').textContent = message;
+  document.body.appendChild(el);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { el.remove(); }, 2200);
+}
+
+// ---------- Cart actions ----------
+function addToCart(id) {
+  const p = productById(id);
+  if (!p) return;
+  const line = state.cart.find(c => c.id === id);
+  if (line) {
+    if (line.qty >= MAX_QTY) { showToast('Invalid quantity — maximum is ' + MAX_QTY + ' per item', 'error'); return; }
+    line.qty += 1;
+  } else {
+    state.cart.push({ id: id, qty: 1 });
+  }
+  render();
+  showToast('Product added — ' + p.name);
+}
+function changeQty(id, delta) {
+  const line = state.cart.find(c => c.id === id);
+  if (!line) return;
+  if (delta > 0 && line.qty >= MAX_QTY) { showToast('Invalid quantity — maximum is ' + MAX_QTY + ' per item', 'error'); return; }
+  if (delta < 0 && line.qty <= 1) { showToast('Invalid quantity — tap the trash button to remove this item', 'error'); return; }
+  line.qty += delta;
+  render();
+}
+function removeFromCart(id) {
+  const p = productById(id);
+  state.cart = state.cart.filter(c => c.id !== id);
+  render();
+  showToast('Removed — ' + p.name);
+}
+
+// ---------- Payment + transaction ----------
+// Creates the transaction ONLY after a payment is accepted. The order is copied (snapshot)
+// so the success screen and receipt always show exactly what was paid for.
+function completePayment(method, paid) {
+  const total = cartTotal();
+  if (state.cart.length === 0 || paid < total) return;   // never complete an invalid payment
+  state.transaction = {
+    txn: reference('TXN'),
+    method: method,
+    lines: cartLines(),
+    total: total,
+    paid: paid,
+    change: paid - total,
+    date: new Date()
+  };
+  nextSeq += 1;
+  saveSeq();
+  state.processing = false;
+  state.screen = 'success';
+  render();
+}
+function payCash() {
+  const total = cartTotal();
+  const paid = paidAmount();
+  if (paid < total) {
+    // Basic guard for Stage 3. The full red alert box comes in Stage 4.
+    showToast('Insufficient payment — please enter at least ' + peso(total), 'error');
+    return;
+  }
+  completePayment('Cash', paid);
+}
+function payQR() { completePayment('QR Payment', cartTotal()); }
+function payCard() {
+  if (state.processing) return;
+  state.processing = true;
+  render();                                   // shows the animated progress bar
+  setTimeout(function () { completePayment('Credit / Debit Card', cartTotal()); }, 1800);
+}
+function newTransaction() {
+  state.cart = [];
+  state.paidText = '';
+  state.quick = null;
+  state.processing = false;
+  state.transaction = null;
+  state.filter = 'All';
+  state.screen = 'order';
+  render();
+  showToast('New transaction started — previous order cleared');
+}
+
+// ---------- Navigation ----------
+function goTo(screen) {
+  const needsOrder = ['review', 'payment', 'cash', 'qr', 'card'];
+  if (needsOrder.indexOf(screen) !== -1 && state.cart.length === 0) {
+    state.screen = 'order';
+    render();
+    showToast('Your order is empty — add a product first', 'error');
+    return;
+  }
+  if (screen === 'receipt' && !state.transaction) return;
+  if (screen === 'cash') { state.paidText = ''; state.quick = null; }   // fresh cash entry
+  state.screen = screen;
+  render();
+}
+
+// ---------- Cash keypad ----------
+function pressKey(digit) {
+  if (state.paidText === '' && digit === '0') return;            // no leading zeros
+  if (state.paidText.length >= MAX_PAID_DIGITS) { showToast('Amount is too large', 'error'); return; }
+  state.paidText += digit;
+  state.quick = null;
+  render();
+}
+function pickQuick(key) {
+  const total = cartTotal();
+  const amounts = { exact: total, '200': 200, '500': 500, '1000': 1000 };
+  state.paidText = String(amounts[key]);
+  state.quick = key;
+  render();
+}
 
 // ---------- Icons (simple line icons, 24x24) ----------
 const ICON_ATTR = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"';
@@ -167,21 +316,22 @@ function paymentScreen() {
 // ---------- Screen 4: Cash ----------
 function cashScreen() {
   const total = cartTotal();
-  const paid = SAMPLE.paid;
+  const paid = paidAmount();
+  const enough = paid >= total;
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(k => '<button class="key" data-action="key" data-value="' + k + '">' + k + '</button>').join('');
-  const quick = [['Exact', total], ['₱200', 200], ['₱500', 500], ['₱1,000', 1000]].map(q =>
-    '<button class="quick-btn' + (q[1] === paid ? ' selected' : '') + '" data-action="quick" data-value="' + q[1] + '">' + q[0] + '</button>'
+  const quick = [['exact', 'Exact'], ['200', '₱200'], ['500', '₱500'], ['1000', '₱1,000']].map(q =>
+    '<button class="quick-btn' + (state.quick === q[0] ? ' selected' : '') + '" data-action="quick" data-value="' + q[0] + '">' + q[1] + '</button>'
   ).join('');
   return '<main class="screen cash-layout"><section>' +
     '<div class="title-line"><div class="title-icon" style="background:#dcfce7;color:#166534">' + icon('cash') + '</div><h1>Cash Payment</h1></div>' +
     '<div class="card amount-card"><span class="l">Total amount</span><span class="v">' + peso(total) + '</span></div>' +
     '<div class="field-label">Amount paid</div><div class="amount-input">' + peso(paid) + '</div>' +
     '<div class="quick-label">Quick amounts</div><div class="quick-row">' + quick + '</div>' +
-    '<div class="change-box"><div><div class="t1">Change</div><div class="t2">' + peso(paid) + ' – ' + peso(total) + '</div></div><div class="v">' + peso(paid - total) + '</div></div>' +
+    '<div class="change-box"><div><div class="t1">Change</div><div class="t2">' + peso(paid) + ' – ' + peso(total) + '</div></div><div class="v">' + (enough ? peso(paid - total) : '—') + '</div></div>' +
     '</section><section class="keypad-area"><div class="keypad">' + keys +
     '<button class="key muted" data-action="clear">Clear</button><button class="key" data-action="key" data-value="0">0</button>' +
     '<button class="key muted" data-action="backspace" aria-label="Backspace">' + icon('back') + '</button></div>' +
-    '<button class="btn btn-primary" data-action="go" data-screen="success">Pay Now</button>' +
+    '<button class="btn btn-primary" data-action="paycash">Pay Now</button>' +
     '<button class="btn btn-secondary" data-action="go" data-screen="payment">' + icon('left') + ' Change payment method</button>' +
     '</section></main>';
 }
@@ -191,14 +341,14 @@ function qrScreen() {
   const total = peso(cartTotal());
   return '<main class="screen split-layout"><section>' +
     '<div class="card visual-card"><div><div class="qr-box"><div class="qr-corner tl"></div><div class="qr-corner tr"></div><div class="qr-corner bl"></div>' +
-    '<div class="qr-label">QR CODE<small>placeholder</small></div></div><div class="qr-ref">Ref: ' + SAMPLE.qrRef + '</div></div></div></section>' +
+    '<div class="qr-label">QR CODE<small>placeholder</small></div></div><div class="qr-ref">Ref: ' + reference('QR-TXN') + '</div></div></div></section>' +
     '<section class="info-side"><div class="title-line"><div class="title-icon" style="background:#dbeafe;color:#1d4ed8">' + icon('qr') + '</div><h1>QR Payment</h1></div>' +
     '<div class="card amount-card"><span class="l">Amount to pay</span><span class="v">' + total + '</span></div>' +
     '<ol class="qr-steps"><li><span class="n">1</span>Scan the QR code using your supported payment application.</li>' +
     '<li><span class="n">2</span>Check that the amount is ' + total + ' and approve it in your app.</li>' +
     '<li><span class="n">3</span>Tap Confirm Payment below.</li></ol>' +
     '<div class="button-row"><button class="btn btn-secondary" data-action="go" data-screen="payment">' + icon('left') + ' Back</button>' +
-    '<button class="btn btn-primary" data-action="go" data-screen="success">' + icon('check') + ' Confirm Payment</button></div>' +
+    '<button class="btn btn-primary" data-action="payqr">' + icon('check') + ' Confirm Payment</button></div>' +
     '<p class="note">Simulated payment — the amount paid will equal the total, with ₱0.00 change.</p></section></main>';
 }
 
@@ -223,59 +373,64 @@ function cardScreen() {
     '<div class="card amount-card"><span class="l">Amount due</span><span class="v">' + peso(cartTotal()) + '</span></div>' +
     '<div class="instruction">Please tap, insert, or swipe your card.</div>' +
     '<div class="processing"><div class="top"><div class="spinner"></div>Processing payment…</div>' +
-    '<div class="progress"><div></div></div><div class="warn">Do not remove your card until the payment is complete.</div></div>' +
-    '<div class="button-row"><button class="btn btn-secondary" data-action="go" data-screen="payment">' + icon('left') + ' Back</button>' +
-    '<button class="btn btn-primary" data-action="go" data-screen="success">Process Payment</button></div></section></main>';
+    '<div class="progress"><div' + (state.processing ? ' class="running"' : '') + '></div></div><div class="warn">Do not remove your card until the payment is complete.</div></div>' +
+    '<div class="button-row"><button class="btn btn-secondary" data-action="go" data-screen="payment"' + (state.processing ? ' disabled' : '') + '>' + icon('left') + ' Back</button>' +
+    '<button class="btn btn-primary" data-action="paycard"' + (state.processing ? ' disabled' : '') + '>Process Payment</button></div></section></main>';
 }
 
 // ---------- Screen 5: Payment successful ----------
 function successScreen() {
-  const total = cartTotal();
+  const t = state.transaction;
   return '<main class="screen center-wrap"><div class="card success-card">' +
     '<div class="success-icon">' + icon('check') + '</div><h1>Payment Successful</h1>' +
     '<p class="sub">Transaction completed successfully. Thank you!</p>' +
     '<div class="details">' +
-    '<div class="detail-row"><span>Transaction No.</span><span class="v mono">' + SAMPLE.txn + '</span></div>' +
-    '<div class="detail-row"><span>Payment method</span><span class="v">' + SAMPLE.method + '</span></div>' +
-    '<div class="detail-row"><span>Transaction amount</span><span class="v">' + peso(total) + '</span></div>' +
-    '<div class="detail-row"><span>Amount paid</span><span class="v">' + peso(SAMPLE.paid) + '</span></div>' +
-    '<div class="detail-row"><span>Change</span><span class="v green">' + peso(SAMPLE.paid - total) + '</span></div></div>' +
+    '<div class="detail-row"><span>Transaction No.</span><span class="v mono">' + t.txn + '</span></div>' +
+    '<div class="detail-row"><span>Payment method</span><span class="v">' + t.method + '</span></div>' +
+    '<div class="detail-row"><span>Transaction amount</span><span class="v">' + peso(t.total) + '</span></div>' +
+    '<div class="detail-row"><span>Amount paid</span><span class="v">' + peso(t.paid) + '</span></div>' +
+    '<div class="detail-row"><span>Change</span><span class="v green">' + peso(t.change) + '</span></div></div>' +
     '<button class="btn btn-primary" data-action="go" data-screen="receipt">' + icon('receipt') + ' View Receipt</button></div></main>';
 }
 
 // ---------- Screen 6: Receipt ----------
 function receiptScreen() {
-  const total = cartTotal();
-  const items = cartLines().map(l =>
+  const t = state.transaction;
+  const items = t.lines.map(l =>
     '<div class="r-item"><div class="n"><span>' + l.name + '</span><span>' + peso(l.subtotal) + '</span></div>' +
     '<div class="d">' + l.qty + ' × ' + peso(l.price) + '</div></div>'
   ).join('');
   return '<main class="screen receipt-layout"><div class="receipt-paper">' +
     '<div class="title">CAMPUS STORE POS</div><div class="sub-title">Self-Service Kiosk · Official Digital Receipt</div><div class="dash"></div>' +
-    '<div class="r-line"><span>Transaction No.</span><strong>' + SAMPLE.txn + '</strong></div>' +
-    '<div class="r-line"><span>Date</span><span>' + SAMPLE.date + '</span></div><div class="dash"></div>' +
+    '<div class="r-line"><span>Transaction No.</span><strong>' + t.txn + '</strong></div>' +
+    '<div class="r-line"><span>Date</span><span>' + formatDate(t.date) + '</span></div><div class="dash"></div>' +
     '<div class="r-line r-head"><span>ITEM</span><span>SUBTOTAL</span></div>' + items + '<div class="dash"></div>' +
-    '<div class="r-line r-total"><span>TOTAL</span><span>' + peso(total) + '</span></div>' +
-    '<div class="r-line"><span>Payment method</span><span>' + SAMPLE.method + '</span></div>' +
-    '<div class="r-line"><span>Amount paid</span><span>' + peso(SAMPLE.paid) + '</span></div>' +
-    '<div class="r-line"><span>Change</span><span>' + peso(SAMPLE.paid - total) + '</span></div>' +
+    '<div class="r-line r-total"><span>TOTAL</span><span>' + peso(t.total) + '</span></div>' +
+    '<div class="r-line"><span>Payment method</span><span>' + t.method + '</span></div>' +
+    '<div class="r-line"><span>Amount paid</span><span>' + peso(t.paid) + '</span></div>' +
+    '<div class="r-line"><span>Change</span><span>' + peso(t.change) + '</span></div>' +
     '<div class="r-line"><span>Status</span><span class="r-status">Payment Successful</span></div>' +
     '<div class="spacer"></div><div class="dash"></div><div class="thanks">Thank you for your purchase!</div></div>' +
     '<div class="receipt-actions"><h1>Your receipt</h1>' +
     '<p class="sub">Keep this for your records. Tap New Transaction when you are done — your order and payment details will be cleared.</p>' +
-    '<button class="btn btn-primary" data-action="go" data-screen="order">' + icon('plus') + ' New Transaction</button>' +
+    '<button class="btn btn-primary" data-action="newtxn">' + icon('plus') + ' New Transaction</button>' +
     '<button class="btn btn-secondary" data-action="print">' + icon('printer') + ' Print Receipt</button>' +
     '<p class="note">Printing is optional — the digital receipt is your proof of payment.</p></div></main>';
 }
 
-// ---------- Render + navigation ----------
+// ---------- Render + click handling ----------
 const SCREENS = {
   order: orderScreen, review: reviewScreen, payment: paymentScreen, cash: cashScreen,
   qr: qrScreen, card: cardScreen, success: successScreen, receipt: receiptScreen
 };
 
 function render() {
+  // Keep the order list scrolled where it was when the screen is redrawn.
+  const list = document.querySelector('.order-rows');
+  const scroll = list ? list.scrollTop : 0;
   document.getElementById('app').innerHTML = headerHTML() + SCREENS[state.screen]();
+  const newList = document.querySelector('.order-rows');
+  if (newList) newList.scrollTop = scroll;
 }
 
 // One click listener for the whole app. Each button has a data-action.
@@ -283,11 +438,23 @@ document.getElementById('app').addEventListener('click', function (e) {
   const btn = e.target.closest('[data-action]');
   if (!btn || btn.disabled) return;
   const action = btn.dataset.action;
+  const id = btn.dataset.id;
 
-  if (action === 'go') { state.screen = btn.dataset.screen; render(); }
+  if (action === 'go') goTo(btn.dataset.screen);
   else if (action === 'filter') { state.filter = btn.dataset.value; render(); }
-  else if (action === 'print') { window.print(); }
-  // add / plus / minus / remove / key / quick / clear / backspace are wired up in Stage 3.
+  else if (action === 'add') addToCart(id);
+  else if (action === 'plus') changeQty(id, 1);
+  else if (action === 'minus') changeQty(id, -1);
+  else if (action === 'remove') removeFromCart(id);
+  else if (action === 'key') pressKey(btn.dataset.value);
+  else if (action === 'quick') pickQuick(btn.dataset.value);
+  else if (action === 'clear') { state.paidText = ''; state.quick = null; render(); }
+  else if (action === 'backspace') { state.paidText = state.paidText.slice(0, -1); state.quick = null; render(); }
+  else if (action === 'paycash') payCash();
+  else if (action === 'payqr') payQR();
+  else if (action === 'paycard') payCard();
+  else if (action === 'newtxn') newTransaction();
+  else if (action === 'print') window.print();
 });
 
 render();
