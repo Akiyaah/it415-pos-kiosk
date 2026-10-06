@@ -5,6 +5,33 @@
 // The cart, cash entry, payment and receipt now use REAL data.
 // Strict payment validation and its error messages are finished in Stage 4.
 
+/*
+ * PENDING OPTIMIZATIONS (not yet merged)
+ * Implemented in the optimization branch as app-optimizedv1.js.
+ * This file on main does not include them yet.
+ *
+ * Performance
+ * - Replace Array.find in productById() with a Map lookup (PRODUCT_MAP).
+ * - Let cartTotal() accept precomputed lines, and build the cart lines once
+ *   per render in orderScreen() instead of twice.
+ * - Cache generated SVG strings in icon() instead of rebuilding them on
+ *   every render.
+ *
+ * Robustness
+ * - Fall back to a generic "box" icon when a product id has no matching
+ *   entry in ICONS, instead of rendering "undefined".
+ * - Guard removeFromCart() against unknown product ids (currently throws).
+ * - HTML-escape product names (esc()) before inserting them into templates.
+ * - Store the card-payment timer (cardTimer) and cancel it in
+ *   newTransaction().
+ * - Add syncSeq() to re-read the saved transaction counter before a number
+ *   is issued, so two tabs cannot reuse the same reference.
+ *
+ * Accessibility
+ * - Add role="status" / role="alert" to toasts so screen readers announce
+ *   them, and mark decorative icons aria-hidden.
+ */
+
 // ---------- State ----------
 const STORAGE_KEY = 'slurpNoodleNextTxn';   // remembers the next transaction number
 const MAX_QTY = 99;                         // largest quantity for one item
