@@ -1,0 +1,27 @@
+/* Design tokens (to be matched against the Sample UI PDF) */
+:root {
+  --navy: #14213d;
+  --orange: #c2410c;
+  --orange-dark: #9a3412;
+  --bg: #eef2f7;
+  --card: #ffffff;
+  --border: #d9e0ea;
+  --text: #1f2937;
+  --green: #16a34a;
+  --red: #dc2626;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Nunito", "Segoe UI", system-ui, sans-serif;
+}
+
+#app {
+  min-height: 100vh;
+}
