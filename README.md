@@ -2,6 +2,12 @@
 
 A touchscreen Point of Sale (POS) kiosk for a small noodle shop, built for the IT415 Practical Examination. A customer taps dishes, reviews the order, pays by Cash, QR or Card, and gets a digital receipt. QR and card payments are **simulated**. No real payment processing exists.
 
+## Deployment
+
+The project is deployed on Vercel and connected to the GitHub repository. Production deployments are created from the `main` branch.
+
+Live Demo: https://it415-pos-kiosk.vercel.app
+
 ## Required software
 
 - A modern web browser (Chrome, Edge, Firefox, Safari). A tablet or touchscreen laptop is best, but a mouse works too.
