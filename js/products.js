@@ -1,11 +1,17 @@
-// Hard-coded product data. Prices are in pesos (₱).
-// "category" is used by the Drinks / Food / Snacks filter chips.
-// "tile" and "color" are the pastel tile and icon colors from the Sample UI.
+// Hard-coded product data for the noodle shop. Prices are in pesos (₱).
+// "category" is used by the All / Noodles / Sides / Drinks tabs.
+// "tile" is the soft background color behind each dish illustration.
+// The illustration itself is drawn in js/app.js (function art) using the product "id".
+const CATEGORIES = ['All', 'Noodles', 'Sides', 'Drinks'];
+
 const PRODUCTS = [
-  { id: 'coffee',    name: 'Coffee',        price: 45, category: 'Drinks', tile: '#ffedd5', color: '#9a3412' },
-  { id: 'sandwich',  name: 'Sandwich',      price: 50, category: 'Food',   tile: '#fef3c7', color: '#92400e' },
-  { id: 'softdrink', name: 'Soft Drink',    price: 35, category: 'Drinks', tile: '#fee2e2', color: '#b91c1c' },
-  { id: 'cookies',   name: 'Cookies',       price: 25, category: 'Snacks', tile: '#f5e9d9', color: '#854d0e' },
-  { id: 'water',     name: 'Bottled Water', price: 20, category: 'Drinks', tile: '#dbeafe', color: '#1d4ed8' },
-  { id: 'chocolate', name: 'Chocolate',     price: 25, category: 'Snacks', tile: '#ebe3de', color: '#5b3a2e' }
+  { id: 'tonkotsu',  name: 'Tonkotsu Ramen',   price: 180, category: 'Noodles', tile: '#fff1de' },
+  { id: 'spicymiso', name: 'Spicy Miso Ramen', price: 190, category: 'Noodles', tile: '#ffe4dc' },
+  { id: 'beefmami',  name: 'Beef Mami',        price: 120, category: 'Noodles', tile: '#fdf0cf' },
+  { id: 'pancit',    name: 'Pancit Canton',    price: 85,  category: 'Noodles', tile: '#fde8c8' },
+  { id: 'udon',      name: 'Udon Soup',        price: 160, category: 'Noodles', tile: '#e8eef0' },
+  { id: 'gyoza',     name: 'Gyoza (5 pcs)',    price: 90,  category: 'Sides',   tile: '#f4ece3' },
+  { id: 'siomai',    name: 'Siomai (4 pcs)',   price: 55,  category: 'Sides',   tile: '#fcf0d4' },
+  { id: 'icedtea',   name: 'Iced Tea',         price: 35,  category: 'Drinks',  tile: '#ffe9d2' },
+  { id: 'greentea',  name: 'Hot Green Tea',    price: 40,  category: 'Drinks',  tile: '#e9f3dc' }
 ];
