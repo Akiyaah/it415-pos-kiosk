@@ -5,6 +5,36 @@
    ===================================================================== */
 
 /* ===== Design tokens ===== */
+
+/*
+ * PENDING OPTIMIZATIONS (not yet merged)
+ * Implemented in the optimization branch as styles-optimizedv1.css.
+ * This file on main does not include them yet.
+ *
+ * Functionality
+ * - Add @media print rules so Print Receipt prints only the receipt paper.
+ *   Currently there are no print styles, so the header and buttons print too.
+ *
+ * Touch / kiosk behavior
+ * - Add touch-action: manipulation to buttons to prevent double-tap zoom on
+ *   rapid taps.
+ * - Change #app from height: 100vh to height: 100% to avoid overshooting the
+ *   visible area in some kiosk and mobile browsers.
+ *
+ * Performance
+ * - Animate the card progress bar with transform: scaleX() instead of width
+ *   to avoid forcing layout on every frame.
+ *
+ * Accessibility
+ * - Add :focus-visible outlines for buttons.
+ * - Add prefers-reduced-motion handling for the toast and press effects.
+ *
+ * Cleanup
+ * - Remove the dead .product-tile svg size rule (overridden by the inline
+ *   size set in icon()).
+ * - Merge the duplicate .toast rules into a single block.
+ */
+
 :root {
   --ink: #2b1a10;
   --brown: #1c120c;
