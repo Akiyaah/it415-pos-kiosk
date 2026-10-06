@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<!--
+  PENDING OPTIMIZATIONS (not yet merged)
+  Implemented in the optimization branch as index-optimizedv1.html.
+  This file on main does not include them yet.
+
+  - Load scripts with defer (execution order unchanged: products.js, then app).
+  - Point asset references to the optimized files:
+    css/styles-optimizedv1.css and js/app-optimizedv1.js.
+  - Not included in this round: self-hosting the Google Fonts files to remove
+    the external, render-blocking request (follow-up).
+-->
+  <head>
   <meta charset="UTF-8">
   <!-- Tablet kiosk: fit the screen width, and stop pinch-zoom so a stray touch never zooms the kiosk. -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
