@@ -2,8 +2,8 @@
 // Only the VIEW changed in this stage (markup, icons, illustrations). The cart, payment,
 // validation and transaction logic is exactly the same as before.
 // Every screen is drawn by a small function that returns HTML.
-// The cart, cash entry, payment and receipt now use REAL data.
-// Strict payment validation and its error messages are finished in Stage 4.
+// The cart, cash entry, payment and receipt use REAL data.
+// Stage 4: strict cash validation (blank, invalid, negative, insufficient) with a red alert box.
 
 // ---------- State ----------
 const STORAGE_KEY = 'slurpNoodleNextTxn';   // remembers the next transaction number
@@ -16,6 +16,7 @@ const state = {
   cart: [],             // [{ id, qty }] - starts empty
   paidText: '',         // digits typed on the cash keypad, e.g. "200"
   quick: null,          // which quick amount is selected: 'exact' | '200' | '500' | '1000' | null
+  cashError: null,      // { title, text } shown in the red alert box when Pay Now is rejected
   processing: false,    // true while the simulated card payment is running
   transaction: null     // the completed transaction (set only after a successful payment)
 };
@@ -124,15 +125,39 @@ function completePayment(method, paid) {
   state.screen = 'success';
   render();
 }
-function payCash() {
+// Checks the cash entry BEFORE any transaction is created.
+// Returns null when the payment is valid, or { title, text } describing the problem.
+function validateCash() {
   const total = cartTotal();
-  const paid = paidAmount();
-  if (paid < total) {
-    // Basic guard for Stage 3. The full red alert box comes in Stage 4.
-    showToast('Insufficient payment — please enter at least ' + peso(total), 'error');
-    return;
+  const text = state.paidText;
+  if (text === '') {
+    return { title: 'Amount required.', text: 'Please enter the amount paid, or tap a quick amount.' };
   }
-  completePayment('Cash', paid);
+  const paid = Number(text);
+  if (!/^\d+$/.test(text) || !isFinite(paid)) {
+    return { title: 'Invalid amount.', text: 'Please enter numbers only, for example 200.' };
+  }
+  if (paid < 0) {
+    return { title: 'Invalid amount.', text: 'The amount paid cannot be negative.' };
+  }
+  if (paid < total) {
+    return {
+      title: 'Insufficient payment.',
+      text: 'Please enter at least ' + peso(total) + '. You are short by ' + peso(total - paid) + '.'
+    };
+  }
+  return null;   // paid >= total (exact payment is valid, change = ₱0.00)
+}
+function payCash() {
+  const problem = validateCash();
+  if (problem) {
+    state.cashError = problem;   // red alert box + red border on the amount box
+    state.quick = null;          // no quick amount stays selected
+    render();
+    return;                      // stay on the cash screen; no transaction, no receipt
+  }
+  state.cashError = null;
+  completePayment('Cash', paidAmount());
 }
 function payQR() { completePayment('QR Payment', cartTotal()); }
 function payCard() {
@@ -145,6 +170,7 @@ function newTransaction() {
   state.cart = [];
   state.paidText = '';
   state.quick = null;
+  state.cashError = null;
   state.processing = false;
   state.transaction = null;
   state.filter = 'All';
@@ -163,7 +189,7 @@ function goTo(screen) {
     return;
   }
   if (screen === 'receipt' && !state.transaction) return;
-  if (screen === 'cash') { state.paidText = ''; state.quick = null; }   // fresh cash entry
+  if (screen === 'cash') { state.paidText = ''; state.quick = null; state.cashError = null; }   // fresh cash entry
   state.screen = screen;
   render();
 }
@@ -174,6 +200,7 @@ function pressKey(digit) {
   if (state.paidText.length >= MAX_PAID_DIGITS) { showToast('Amount is too large', 'error'); return; }
   state.paidText += digit;
   state.quick = null;
+  state.cashError = null;
   render();
 }
 function pickQuick(key) {
@@ -181,6 +208,7 @@ function pickQuick(key) {
   const amounts = { exact: total, '200': 200, '500': 500, '1000': 1000 };
   state.paidText = String(amounts[key]);
   state.quick = key;
+  state.cashError = null;
   render();
 }
 
@@ -408,6 +436,10 @@ function cashScreen() {
   const total = cartTotal();
   const paid = paidAmount();
   const enough = paid >= total;
+  const err = state.cashError;
+  const alertBox = err
+    ? '<div class="alert-box" role="alert">' + icon('alert') + '<div><strong>' + err.title + '</strong><span>' + err.text + '</span></div></div>'
+    : '';
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(k => '<button class="key" data-action="key" data-value="' + k + '">' + k + '</button>').join('');
   const quick = [['exact', 'Exact'], ['200', '₱200'], ['500', '₱500'], ['1000', '₱1,000']].map(q =>
     '<button class="quick-btn' + (state.quick === q[0] ? ' selected' : '') + '" data-action="quick" data-value="' + q[0] + '">' + q[1] + '</button>'
@@ -415,7 +447,7 @@ function cashScreen() {
   return '<main class="screen cash-layout"><section>' +
     '<div class="title-line"><div class="title-icon" style="background:#dcfce7;color:#166534">' + icon('cash') + '</div><h1>Cash Payment</h1></div>' +
     '<div class="card amount-card"><span class="l">Total amount</span><span class="v">' + peso(total) + '</span></div>' +
-    '<div class="field-label">Amount paid</div><div class="amount-input">' + peso(paid) + '</div>' +
+    '<div class="field-label">Amount paid</div><div class="amount-input' + (err ? ' error' : '') + '">' + peso(paid) + '</div>' + alertBox +
     '<div class="quick-label">Quick amounts</div><div class="quick-row">' + quick + '</div>' +
     '<div class="change-box"><div><div class="t1">Change</div><div class="t2">' + peso(paid) + ' – ' + peso(total) + '</div></div><div class="v">' + (enough ? peso(paid - total) : '—') + '</div></div>' +
     '</section><section class="keypad-area"><div class="keypad">' + keys +
@@ -547,8 +579,8 @@ document.getElementById('app').addEventListener('click', function (e) {
   else if (action === 'remove') removeFromCart(id);
   else if (action === 'key') pressKey(btn.dataset.value);
   else if (action === 'quick') pickQuick(btn.dataset.value);
-  else if (action === 'clear') { state.paidText = ''; state.quick = null; render(); }
-  else if (action === 'backspace') { state.paidText = state.paidText.slice(0, -1); state.quick = null; render(); }
+  else if (action === 'clear') { state.paidText = ''; state.quick = null; state.cashError = null; render(); }
+  else if (action === 'backspace') { state.paidText = state.paidText.slice(0, -1); state.quick = null; state.cashError = null; render(); }
   else if (action === 'paycash') payCash();
   else if (action === 'payqr') payQR();
   else if (action === 'paycard') payCard();
